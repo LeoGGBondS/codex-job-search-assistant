@@ -11,7 +11,7 @@ Resolve paths from the repository root, three parents above this skill directory
 
 If the profile is absent or incomplete, read [references/onboarding.md](references/onboarding.md) and conduct the intake. Run `python scripts/job_assistant.py init` only to create blank local state; it never overwrites existing state. Existing confirmed facts should not be asked again. Unknown facts stay null. Resume files and optional answers can be added later without blocking initial screening.
 
-For discovery, screening, application execution, and recovery, read [references/workflow.md](references/workflow.md). For recurring requests, also read [references/automation.md](references/automation.md). Only promise tools actually available in this Codex environment.
+For discovery, screening, application execution, and recovery, read [references/workflow.md](references/workflow.md). When an application asks new or conditional questions, read [references/application-questions.md](references/application-questions.md). For recurring requests, also read [references/automation.md](references/automation.md). Only promise tools actually available in this Codex environment.
 
 ## Evidence and limits
 
