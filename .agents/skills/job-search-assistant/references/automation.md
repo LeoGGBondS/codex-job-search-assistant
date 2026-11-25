@@ -11,3 +11,9 @@ Changing profile.schedule alone does not create a live scheduler. Mark enabled o
 Read the saved language, application mode and output directory each run. General mode reuses/lightly edits; precise mode tailors and verifies a one-page ATS-friendly export from any-length sources. Reuse the factual experience bank; do not reread all resumes or the entire report when working on one pending ID.
 
 Refresh the same Desktop master report and current local-date daily record after each run, including a run with no new successful submissions. Keep historical daily files. Save all new artifacts/receipts in local-date/case-ID directories. Pending IDs can be resumed after the user provides materials; do not repeatedly attempt a still-blocked case on each scheduled run. Scheduling does not waive consent or receipt checks. The output helper does not itself create a schedule.
+
+## Optional email sync and blockers
+
+Include email sync in a recurring prompt only after explicit user opt-in: read references/email.md, verify the current connector/account, search within the agreed job-mail scope, ingest minimal deduplicated events and refresh reports. No connection/permission means no email feature. Never put codes or credentials in the prompt or output. Verification assistance remains separately opt-in and subject to actual tool rules. Email access does not permit sending replies. A connector failure should not prevent unrelated job discovery/submissions.
+
+Use references/screening.md for early material checks, freshness and effort prioritization. Record every blocked/unsupported/uncertain attempt with a reason, next action and retry condition. Report pending IDs as well as successes; do not repeatedly attempt unresolved cases or silently omit site failures.
