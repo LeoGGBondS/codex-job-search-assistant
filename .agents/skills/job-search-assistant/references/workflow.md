@@ -14,7 +14,21 @@ Record discovered candidates with the canonical job URL. Deduplicate before prep
 
 ## Prepare
 
-Use their original resume unchanged if suitable. When useful reorder projects/skills or edit a few supported bullets. Preserve the original and save the exact per-job submitted file. Do not create a cover letter unless required or requested. Use an available document/PDF workflow when editing those formats and inspect the result. Do not claim a PDF was created merely because a text draft exists.
+Use profile.application_mode (or the user's per-case override). Accept multi-page resumes and multiple source files in both modes. Read every relevant page; cache a factual experience bank locally so later jobs do not require reprocessing the whole source. Keep all originals unchanged.
+
+### General applications
+
+Reuse the current resume when suitable. Only reorder or lightly reword supported experience when useful. Do not default to a cover letter or a full rewrite. This is the efficient mode; it does not promise a new one-page export for every job.
+
+### Precise applications
+
+1. Read the full JD and all relevant source resume pages. Match concrete requirements to evidence, distinguishing mandatory qualifications from preferences.
+2. Select the strongest truthful experience, skills and projects for that job. Use relevant JD terminology only where factually supported; never add a skill, credential, result or number because a keyword is present.
+3. Produce a one-page resume in the JD's application language. Use a single column, ordinary headings, selectable text, readable body size and clear chronology. Avoid graphics, text boxes, nested tables and keyword stuffing. Prioritize and shorten content before reducing font size or margins. ATS-friendly conventions improve readability but do not guarantee an ATS score or interview.
+4. Use available document/PDF authoring tools. Render the exported file, verify page count equals one, inspect for clipping and legibility, then extract its text to check section order, dates, contact information and key content. Reflow and repeat if it spills onto a second page. If required facts cannot fit legibly, ask which lower-priority content may be omitted; do not upload a multi-page file while claiming it is the precise one-page version.
+5. Save the file and a brief factual change record under the configured report directory/local-date/case-ID. Preserve the exact submitted version. Before transmission, honor any constraint limiting consent to an original unchanged resume.
+
+Use an available document/PDF workflow when editing those formats; if the environment cannot create/verify an export, explain that limitation rather than claiming success. A text draft is not a verified PDF. Reports and application material can use different languages. Do not create a cover letter unless required or requested.
 
 ## Apply
 
@@ -31,3 +45,15 @@ After submission verify explicit receipt. Save confirmation URL, any application
 Use `python scripts/job_assistant.py record --file work/candidate.json`, then `python scripts/job_assistant.py render`. Input fields: company, role, url, job_id (optional), status, notes, resume_path, submitted_at, submission_evidence. Optional id is stable if supplied; the helper deduplicates by company/job ID or canonical URL. Supported statuses include discovered, screened, skipped, drafted, needs_input, ready, submitted, submission_unknown, rejected, interview, withdrawn.
 
 `submission_evidence` is required for submitted records. Do not demote or overwrite a confirmed submitted record accidentally. Preserve submitted_at and evidence if later recording interview/rejected/withdrawn. Daily counts include later outcome changes, so changing status cannot reset the submission cap. Rebuild the Markdown log after every material update and at the end of a run. Report actual successful submissions, remaining queue, and concrete blockers.
+
+## Resume a pending case
+
+Prefer the stable short case ID over repeating full context. `lookup J0001` or lookup with the original URL returns one record. `resume J0001 --material <local-file>` attaches supplied local material and flags a review request; it does not submit, erase blockers, or imply every prerequisite is satisfied. Answers may be provided through --answers-file when explicitly confirmed by the user.
+
+Read that case's blocking_items and the supplied materials, revisit the live JD and application status, and update only the resolved facts. Ask only remaining necessary questions. Mark ready and clear blockers only after verifying they are resolved, then use the usual consent, gate, submission and receipt process. If the job is closed, record that reason. Confirmed submissions and submission_unknown cases cannot be reapplied automatically. A request to provide an additional document to an already-submitted employer is a distinct follow-up, not a fresh application.
+
+## Dated localized outputs
+
+Write human-facing headings, status labels, blocker descriptions and summaries in profile.language (zh/en); retain proper names and actual job titles. Machine JSON keys stay stable. The helper localizes its own labels, not arbitrary candidate text, so the agent writes notes in the chosen report language.
+
+`render` updates report-root/applications.md and report-root/daily/YYYY-MM-DD.md in the user's timezone. Each row has its short case ID and update/submission dates. The master contains all records; the daily document contains cases created, changed or submitted that date. Refresh the same day's file during the day and preserve previous days. Use `artifact-dir J0001` for the dated material/receipt directory. If Desktop access is denied, obtain the exact needed permission or a user-chosen alternative; never silently claim files are on the Desktop.
