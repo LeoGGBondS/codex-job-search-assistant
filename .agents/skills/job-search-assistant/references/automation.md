@@ -17,3 +17,9 @@ Refresh the same Desktop master report and current local-date daily record after
 Include email sync in a recurring prompt only after explicit user opt-in: read references/email.md, verify the current connector/account, search within the agreed job-mail scope, ingest minimal deduplicated events and refresh reports. No connection/permission means no email feature. Never put codes or credentials in the prompt or output. Verification assistance remains separately opt-in and subject to actual tool rules. Email access does not permit sending replies. A connector failure should not prevent unrelated job discovery/submissions.
 
 Use references/screening.md for early material checks, freshness and effort prioritization. Record every blocked/unsupported/uncertain attempt with a reason, next action and retry condition. Report pending IDs as well as successes; do not repeatedly attempt unresolved cases or silently omit site failures.
+
+## Permission readiness without repetitive prompts
+
+Read [storage-permissions.md](storage-permissions.md). Before application work, run check-access against the canonical store loaded through personal/storage.json. Reuse current permission; do not proactively ask for the same directory on every daily run. If access is denied, stop mutations/submissions, save one actionable blocker to a permitted local status file and report the exact directory/permission needed. A previous turn-only approval does not establish background access. Keep scheduled/active and runtime-ready states distinct; never report full unattended readiness from a profile flag or from only a foreground test. Do not disable host safeguards to remove prompts.
+
+Use the compact five-column report and full-width case notes. Short link labels must retain complete destinations. Preserve old dated snapshots and all evidence.
