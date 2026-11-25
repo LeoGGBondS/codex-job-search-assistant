@@ -18,7 +18,7 @@ Use their original resume unchanged if suitable. When useful reorder projects/sk
 
 ## Apply
 
-Check actual browser tools. If unavailable, prepare a local queue and explain the missing capability; do not claim standalone auto-apply. Review all required questions and use only confirmed answers. Optional demographic fields stay blank unless the user explicitly chooses responses. Stop only the affected application for unknown mandatory answers and continue others where possible.
+Check actual browser tools. If unavailable, prepare a local queue and explain the missing capability; do not claim standalone auto-apply. Review all required questions and use only confirmed answers. For new/conditional questions, use [application-questions.md](application-questions.md); ask only unresolved blocking facts and save confirmed reusable answers locally. Optional demographic fields stay blank unless the user explicitly chooses responses. Stop only the affected application for unknown mandatory answers and continue others where possible.
 
 Before sending personal data, follow the current tool's destination/data confirmation rules. A scoped consent record should contain company, destination domain, job ID(s), exact data categories, resume path/version, timestamp, and the user's confirming message/reference. It is an audit note, not permission to invent or widen authorization. Legal agreements, CAPTCHAs, account creation, and authentication requirements need whatever action-time confirmation/handoff the actual tool requires.
 
