@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-ALLOWED_TOP = {'AGENTS.md', 'README.md', 'LICENSE', '.gitignore', '.gitattributes', 'requirements.txt',
+ALLOWED_TOP = {'AGENTS.md', 'README.md', 'README_CN.md', 'LICENSE', '.gitignore', '.gitattributes', 'requirements.txt',
                '.agents', '.github', 'scripts', 'tests', 'examples'}
 PRIVATE_DIRS = {'personal', 'outputs', 'work', '.venv', 'venv', '__pycache__'}
 BINARY_SUFFIXES = {'.pdf', '.doc', '.docx', '.rtf', '.png', '.jpg', '.jpeg', '.zip', '.pyc'}
