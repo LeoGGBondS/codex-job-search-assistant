@@ -136,3 +136,19 @@ Suggested source mix: **employer career pages** for current JDs; **LinkedIn** fo
 Setup asks where you can work (including anywhere within your selected countries), relocation, remote/hybrid/in-person preferences, earliest start and relevant full-time/part-time availability. Onsite-day limits and internship duration can be added. These are separate from the assistant's daily run time. Equivalent employer questions reuse confirmed preferences; accepting compatible in-person work and relocation does not require repeating the same location question for every job.
 
 You may optionally describe your country-specific status (for example OPT/STEM OPT, H-1B, permanent resident/green card, citizen, other, or decline). Current work authorization and current/future sponsorship are confirmed separately. No immigration document numbers or images are requested. A completed permanent-residency status and a currently pending immigration case are different; unknown mandatory answers are clarified once and saved with date/context.
+
+## Real folder setup and daily access
+
+Onboarding now creates and verifies the selected Desktop tree, including private profile/history, source-material folders, master/daily reports and a short guide. Existing originals and receipt evidence remain preserved. An ignored checkout-local storage pointer makes later helper commands use the same canonical private data, avoiding two independently updated copies.
+
+```sh
+python scripts/job_assistant.py setup-desktop --directory "<actual Desktop>/Codex Job Search"
+python scripts/job_assistant.py check-access
+python scripts/job_assistant.py render
+```
+
+Choose your actual Desktop path; the angle-bracket text is a placeholder. Existing access is reused. Only a real denial triggers a scoped folder-access request; a new folder can require parent create access once. If your host supports remembered project/session access, select it there. The helper cannot grant permissions. A turn-only grant does not establish access for tomorrow's background run, and a successful local check is not a scheduler-context test. No global security setting is disabled. See the [setup and permissions workflow](.agents/skills/job-search-assistant/references/storage-permissions.md).
+
+Daily scheduling still uses the real Codex scheduler. Scheduled/active and fully unattended readiness are distinct: file/tool access, browser authentication and applicable application confirmations must also be available. This repository cannot guarantee runs without any human participation. If directory access is missing, the run saves one actionable blocker locally instead of repeatedly requesting per-file access or submitting without durable tracking. [Official scheduled-task behavior](https://learn.chatgpt.com/docs/automations?surface=app).
+
+Reports now use **five compact columns** and short **Job / CV / Proof** links. Notes, dates and recovery instructions appear below each case at full width; full URLs/paths and receipt evidence remain intact in private JSON. Both master and daily file links resolve correctly.
