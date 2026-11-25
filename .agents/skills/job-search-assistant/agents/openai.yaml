@@ -1,0 +1,4 @@
+interface:
+  display_name: "Job Search Assistant"
+  short_description: "Onboard, find jobs, prepare applications, and track results"
+  default_prompt: "Use $job-search-assistant to set up my profile and help me find and apply to suitable jobs."
