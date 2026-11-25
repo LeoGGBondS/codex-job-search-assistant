@@ -90,3 +90,9 @@ python scripts/check_public.py
 **不连接邮箱，就不提供邮件读取和追踪；找岗位、投递和手动更新照常使用。** 仓库不包含 Gmail OAuth 客户端、凭证或独立邮件读取器，需要 Codex 环境提供兼容连接器；没有工具时不会假装已连接。configure-email 只保存偏好，不完成授权。可用 `python scripts/job_assistant.py configure-email --disable` 关闭；撤销提供方访问权限需在其设置中完成，已有本地历史保留。
 
 记录工具新增 block 保存具体阻塞、email-event 接收经过整理的最少邮件字段；仅凭邮件分类不会自动改成“已投递”或覆盖后续结果。具体流程见 [邮箱说明](.agents/skills/job-search-assistant/references/email.md) 和 [筛选清单](.agents/skills/job-search-assistant/references/screening.md)。筛选流程借鉴了 [ApplyPilot](https://github.com/yvonnehe772/applypilot) 的思路，不把这些通用做法宣称为独有功能。
+
+## 岗位来源与公司偏好
+
+初始化时会可选询问**公司阶段、人数规模、行业、目标公司与避开的公司**。例如早期 startup、成长型、成熟/上市公司，或“不限”；可以多选，之后随时更改。公司阶段与人数分开记录。“优先考虑”只影响排序，只有明确要求才作为硬性筛选；未知公司信息不会编造。老用户可以补充，不用重新初始化。
+
+建议组合使用：**公司官网**核实当前 JD；**LinkedIn**找线索和设置提醒；**Greenhouse/MyGreenhouse、Lever、Ashby**查雇主岗位和申请；**Wellfound、YC Jobs**补充创业公司；**Handshake 或学校就业平台**找适合的实习与校招。Greenhouse 另有面向求职者的搜索/追踪入口 MyGreenhouse，Lever/Ashby 主要是雇主招聘系统。推荐来源不代表已安装接口或获准自动操作，也不代表自动获得邮箱或账号权限。当前流程不自动操作 LinkedIn 网站。官方链接与使用边界见 [岗位来源及公司筛选清单](.agents/skills/job-search-assistant/references/screening.md)。
