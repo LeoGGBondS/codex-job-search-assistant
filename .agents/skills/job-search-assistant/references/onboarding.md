@@ -14,3 +14,13 @@ If the user wants to apply, collect the required name, email, phone, resume vers
 Profile fields are created by `init`. Use lists for target roles/types/locations/countries, booleans or null for preferences and eligibility, and ISO dates where precise dates are known. `education` is a list of records containing institution, degree, start_date, expected_end_date, and source; fields may be null. `gpa` contains actual, estimated, scale, and source; preserve the distinction. `schedule` is inactive by default and needs timezone, local_time, and max_submissions_per_day only if requested. Use an IANA timezone such as Europe/London or America/New_York, not an assumed location.
 
 Store resumes in `personal/resumes/`, scoped consents in `personal/consents.json`, artifacts in `outputs/`, and credentials nowhere in this repository. Do not put candidate details into tracked examples or the README.
+
+## Progressive application questions
+
+Current residence is separate from desired job locations. Ask for city, region/state and country if an application needs them; never infer residence from a university address. Save confirmed values under profile.current_location.
+
+If an application needs ranked teams or offices, ask whether the user wants to choose or permits resume-based ranking. Save that choice under preference_policy. Only rank supported options and keep separate job-specific preferences where needed. A willingness to relocate is not a ranked office preference; use an explicit any-office option when appropriate.
+
+Store additional confirmed answers in profile.application_answers with value, source, confirmed_at and context (employer/question meaning). Mark time-sensitive information such as competing offer deadlines accordingly; do not silently reuse it forever. Older profiles may lack these optional keys; missing means unknown, and the agent can add them when the user provides answers. Never store a verification code.
+
+For the detailed question-handling checklist, read application-questions.md in this references directory. New required facts should be asked only when they block the affected application; continue independent applications while waiting.
