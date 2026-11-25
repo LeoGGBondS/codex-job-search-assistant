@@ -7,8 +7,10 @@ import os
 import re
 from pathlib import Path
 import sys
+import shutil
+import tempfile
 from datetime import datetime, timezone
-from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode, quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 STATUSES = {'discovered', 'screened', 'skipped', 'drafted', 'needs_input', 'ready',
@@ -123,7 +125,12 @@ def validate_record(item):
 class Store:
     def __init__(self, root):
         self.root = Path(root).resolve()
-        self.personal = self.root / 'personal'
+        self.storage_pointer = self.root / 'personal' / 'storage.json'
+        pointer = load_json(self.storage_pointer, {})
+        directory = pointer.get('data_directory')
+        if directory and not Path(directory).is_absolute():
+            raise ValueError('Private data directory must be absolute')
+        self.personal = Path(directory).resolve() if directory else self.root / 'personal'
         self.profile_path = self.personal / 'profile.json'
         self.records_path = self.personal / 'applications.json'
 
@@ -184,6 +191,91 @@ class Store:
         if records:
             write_json(self.records_path, records)
         return profile
+
+    def check_access(self):
+        # A real local write probe says nothing about the next scheduler run's grants.
+        target = self.report_root()
+        directories = [target, self.personal, self.personal/'resumes', target/'daily']
+        for folder in directories:
+            folder.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(prefix='.job-access-', dir=folder, delete=True) as probe:
+                probe.write(b'job-search access check')
+                probe.flush()
+        return {'write_verified_now': True, 'directory': str(target),
+                'future_permission_scope': 'host_managed_not_established_by_this_check'}
+
+    def setup_desktop(self, directory=None):
+        target = Path(directory).expanduser().resolve() if directory else desktop_directory()/'Codex Job Search'
+        if target.is_relative_to(self.root) and not target.is_relative_to(self.root/'outputs'):
+            raise ValueError('Choose a private Desktop directory or ignored outputs/, not public source')
+        old_personal, old_reports = self.personal, self.report_root()
+        new_personal = target/'personal'
+        if new_personal == old_personal:
+            self.check_access()
+            self.render()
+            return target
+        if (target/'applications.md').exists() and not (new_personal/'profile.json').exists():
+            raise ValueError('Destination contains an unrelated report; choose a separate directory')
+        copies = []
+        for source in old_personal.rglob('*'):
+            if source.is_file() and source.name != 'storage.json':
+                if source.is_symlink():
+                    raise ValueError('Review symlinked private files before migration')
+                copies.append((source,new_personal/source.relative_to(old_personal)))
+        # Carry forward daily history and generated dated case folders; never traverse arbitrary folders.
+        if old_reports.exists() and old_reports != target:
+            history = [old_reports/'daily'] + [x for x in old_reports.iterdir()
+                       if x.is_dir() and re.fullmatch(r'\d{4}-\d{2}-\d{2}',x.name)]
+            for folder in history:
+                if folder.exists():
+                    for source in folder.rglob('*'):
+                        if source.is_file():
+                            if source.is_symlink():
+                                raise ValueError('Review symlinked report files before migration')
+                            copies.append((source,target/source.relative_to(old_reports)))
+        for source,dest in copies:
+            if dest.exists() and dest.read_bytes() != source.read_bytes():
+                raise ValueError('Different destination file already exists: '+str(dest))
+        for source,dest in copies:
+            dest.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(source,dest)
+        profile = self.profile()
+        def moved(value):
+            if not value:
+                return value
+            path = Path(value).expanduser()
+            path = path.resolve() if path.is_absolute() else (self.root/path).resolve()
+            if path.is_relative_to(old_personal):
+                return str(new_personal/path.relative_to(old_personal))
+            if old_reports != target and path.is_relative_to(old_reports):
+                destination = target/path.relative_to(old_reports)
+                if destination.is_file():
+                    return str(destination)
+            return value
+        profile['resume_path'] = moved(profile.get('resume_path'))
+        profile['resume_paths'] = [moved(x) for x in profile.get('resume_paths',[])]
+        profile['output_settings'] = {'directory':str(target)}
+        records = self.records()
+        for record in records:
+            for key in ('resume_path','confirmation_path'):
+                if record.get(key):
+                    record[key] = moved(record[key])
+        self.personal, self.profile_path, self.records_path = new_personal,new_personal/'profile.json',new_personal/'applications.json'
+        write_json(self.profile_path,profile)
+        write_json(self.records_path,records)
+        for folder in (new_personal/'resumes',new_personal/'cover-letters',target/'daily'):
+            folder.mkdir(parents=True,exist_ok=True)
+        self.check_access()
+        self.render()
+        # Publish the canonical pointer last; a denied/partial copy must not redirect later runs.
+        write_json(self.storage_pointer,{'data_directory':str(new_personal)})
+        zh=profile.get('language')=='zh'
+        guide=('使用说明.md' if zh else 'START_HERE.md')
+        if not (target/guide).exists():
+            atomic_text(target/guide,('# 求职助手目录\n\n' if zh else '# Job search folder\n\n')+
+                        'applications.md: '+('总记录；daily/: 每日记录；personal/: 私人资料；日期/编号/: 申请材料与回执。\n' if zh else
+                        'master log; daily/: dated logs; personal/: private data; date/case/: materials and receipts.\n'))
+        return target
 
     def profile(self):
         value = load_json(self.profile_path)
@@ -510,17 +602,58 @@ class Store:
             return str(value if value is not None else '-').replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('|','\\|').replace('\n',' ').replace('\r',' ')
         def stamp(value):
             return timestamp(value).astimezone(local.tzinfo).isoformat(timespec='seconds') if value else None
-        def table(items):
-            lines = ['| '+' | '.join(text['headers'])+' |', '|'+'|'.join(['---']*10)+'|']
-            for item in sorted(items, key=lambda x:x.get('updated_at') or x.get('submitted_at') or '', reverse=True):
-                missing = item.get('blocking_items') or []
-                missing = '; '.join(x if isinstance(x,str) else ' / '.join(str(x[k]) for k in ('description','next_action','retry_when') if x.get(k)) for x in missing)
-                notes = '; '.join(x for x in [missing,item.get('notes')] if x)
-                fields = [item['case_id'],item['company'],item['role'],labels[item['status']],stamp(item.get('submitted_at')),
-                          stamp(item.get('updated_at')),item['url'],item.get('resume_path'),item.get('submission_evidence'),notes]
-                lines.append('| '+' | '.join(clean(x) for x in fields)+' |')
+        def href(label, value, base, local_file=False):
+            if not value:
+                return ''
+            if local_file:
+                path = Path(value).expanduser()
+                path = path.resolve() if path.is_absolute() else (self.root/path).resolve()
+                try:
+                    destination = os.path.relpath(path,base).replace(chr(92),'/')
+                except ValueError:
+                    destination = path.as_posix()
+                destination = quote(destination,safe='/.:_-')
+            else:
+                try:
+                    destination = canonical_url(value)
+                except ValueError:
+                    return ''
+                destination = quote(destination,safe=':/?=&%._-~')
+            return '['+label+']('+destination+')'
+        def table(items, daily=False):
+            # Five compact columns; prose never competes with URLs for a narrow notes cell.
+            headers = ['编号','公司','岗位','状态','链接'] if zh else ['Case','Company','Role','Status','Links']
+            lines = ['| '+' | '.join(headers)+' |', '|'+'|'.join(['---']*5)+'|']
+            base = self.report_root()/('daily' if daily else '')
+            ordered = sorted(items,key=lambda x:x.get('updated_at') or x.get('submitted_at') or '',reverse=True)
+            for item in ordered:
+                links = [href('岗位' if zh else 'Job',item['url'],base),
+                         href('简历' if zh else 'CV',item.get('resume_path'),base,True)]
+                if item.get('confirmation_path'):
+                    links.append(href('回执' if zh else 'Proof',item['confirmation_path'],base,True))
+                elif item.get('submission_evidence'):
+                    urls = re.findall(r'https://[^\s;<>]+',str(item['submission_evidence']))
+                    if urls:
+                        links.append(href('回执' if zh else 'Proof',urls[0],base))
+                fields = [clean(item['case_id']),clean(item['company']),clean(item['role']),clean(labels[item['status']]),' · '.join(x for x in links if x)]
+                lines.append('| '+' | '.join(fields)+' |')
             if not items:
-                lines.append('| '+text['empty']+' | '+' | '.join(['-']*9)+' |')
+                lines.append('| '+text['empty']+' | - | - | - | - |')
+            for item in ordered:
+                lines += ['', '### '+clean(item['case_id'])+' · '+clean(item['company']), '']
+                dates = [('提交' if zh else 'Submitted',stamp(item.get('submitted_at'))),
+                         ('更新' if zh else 'Updated',stamp(item.get('updated_at')))]
+                lines += [' · '.join(label+': '+clean(value) for label,value in dates if value),'']
+                for blocker in item.get('blocking_items') or []:
+                    if isinstance(blocker,str):
+                        lines += [('**原因：** ' if zh else '**Reason:** ')+clean(blocker),'']
+                    else:
+                        for key,label in [('description','原因' if zh else 'Reason'),('next_action','下一步' if zh else 'Next action'),('retry_when','继续条件' if zh else 'Resume when')]:
+                            if blocker.get(key):
+                                lines += ['**'+label+':** '+clean(blocker[key]),'']
+                if item.get('notes'):
+                    lines += [('**备注：** ' if zh else '**Notes:** ')+clean(item['notes']),'']
+                # Keep immutable evidence text in JSON; don't print long raw URLs/path names in columns.
             return lines
         def report(items, daily=False):
             submitted = [x for x in items if x.get('submitted_at')]
@@ -529,7 +662,7 @@ class Store:
             receipt_count = sum(1 for x in submitted if not daily or timestamp(x['submitted_at']).astimezone(local.tzinfo).date() == local.date())
             return '\n'.join(['# '+title,'',text['date']+': '+day,'',text['updated']+': '+local.isoformat(timespec='seconds'),'',
                               text['count']+': **'+str(receipt_count)+'**','',
-                              '## '+text['submitted'],'',*table(submitted),'','## '+text['pending'],'',*table(pending),*self.email_report(zh,day if daily else None),'',text['footer'],''])
+                              '## '+text['submitted'],'',*table(submitted,daily),'','## '+text['pending'],'',*table(pending,daily),*self.email_report(zh,day if daily else None),'',text['footer'],''])
         touched = [x for x in records if any(timestamp(x[k]).astimezone(local.tzinfo).date() == local.date()
                    for k in ('created_at','updated_at','submitted_at') if x.get(k))]
         output = self.report_root()/'applications.md'
@@ -549,7 +682,7 @@ def main():
         child.add_argument('--output-dir')
         if name == 'init':
             child.add_argument('--message',default='')
-    for name in ('status','render'):
+    for name in ('status','render','check-access'):
         commands.add_parser(name)
     for name in ('record','gate'):
         commands.add_parser(name).add_argument('--file',type=Path,required=True)
@@ -572,6 +705,7 @@ def main():
         child.add_argument('--'+name)
     child.add_argument('--verification-assistance', action='store_true')
     commands.add_parser('email-event').add_argument('--file', type=Path, required=True)
+    commands.add_parser('setup-desktop').add_argument('--directory')
     args=parser.parse_args()
     store=Store(args.workspace)
     try:
@@ -588,6 +722,10 @@ def main():
             print(json.dumps({'onboarding_complete':profile.get('onboarding_complete',False),'application_count':len(store.records()),
                               'schedule_enabled':profile.get('schedule',{}).get('enabled',False),'language':profile.get('language','en'),
                               'application_mode':profile.get('application_mode','general'),'output_directory':str(store.report_root())},ensure_ascii=True))
+        elif args.command == 'setup-desktop':
+            print(json.dumps({'directory':str(store.setup_desktop(args.directory))},ensure_ascii=True))
+        elif args.command == 'check-access':
+            print(json.dumps(store.check_access(),ensure_ascii=True))
         elif args.command == 'render':
             print(json.dumps({'report':str(store.render())},ensure_ascii=True))
         elif args.command == 'record':
