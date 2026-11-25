@@ -21,3 +21,25 @@ Optional screening fields on a job record: screening = {fit_evidence: [], gaps: 
 Review repeated blockers after a run. Propose a reusable answer or material once, scoped to its meaning; do not silently generalize employer-specific answers. Ask before changing user preferences. Report confirmed submissions, pending reasons and useful next actions, including runs with zero successes.
 
 The emphasis on phased screening, freshness and application effort was informed by [ApplyPilot's setup workflow](https://github.com/yvonnehe772/applypilot/blob/main/references/setup-workflow.md) and [application playbook](https://github.com/yvonnehe772/applypilot/blob/main/references/application-playbook.md). This reference is an independently written adaptation of those workflow ideas; no browser implementation is imported.
+
+## Company preferences and evidence
+
+Use profile.company_preferences for discovery query variants and ranking, alongside role/location/level. Treat preferred stages, size bands, industries and target companies as soft boosts unless explicitly listed as hard constraints; apply excluded_companies as explicit exclusions. No preference or a skipped question means broad coverage. Do not silently narrow every query to startups or only the user's named companies. Search beyond the target list unless the user says “only”.
+
+Do not infer headcount, funding stage or industry from the ATS vendor, company name or a job title. Prefer current company disclosures/career pages and clearly dated reliable company profiles; record source and checked_at for stage/headcount observations under screening.company_evidence. Employee counts can be ranges or estimates; preserve uncertainty. Unknown or stale size/stage stays unknown, with no invented match. If an explicit hard company constraint cannot be verified, queue only that affected case for review; a soft preference with missing evidence should not block an otherwise suitable job. Re-evaluate after preference changes without reopening submitted applications.
+
+## Suggested discovery sources
+
+These are workflow recommendations, not installed integrations, a complete job index, or evidence of broad ATS support. Select sources based on the candidate's goals and available tools. Recheck each source's current capabilities/access rules when needed. Keep discovery source URLs separately from the canonical employer application URL, so cross-postings deduplicate.
+
+| Source | Suggested use | Execution limit |
+|---|---|---|
+| Employer career pages | Verify the live JD and actual application destination; maintain a user-approved target-company watchlist | Read accessible public pages; do not invent company-specific adapters |
+| [LinkedIn](https://www.linkedin.com/help/linkedin/answer/a511279/job-alerts-on-linkedin?lang=en) | Broad discovery, job alerts and user-provided leads | No LinkedIn scraping/automated site interaction in this workflow; use supplied JD text, permitted public search leads or separately authorized alert emails, then find the employer page |
+| [Greenhouse / MyGreenhouse](https://support.greenhouse.io/hc/en-us/articles/43418495049499-MyGreenhouse-FAQ-for-Candidates) | Employer-hosted jobs plus the MyGreenhouse candidate portal for discovery/applications/tracking | Do not assume all employers participate in the portal or every form behaves identically; verify each job/receipt |
+| [Lever](https://www.lever.co/) / [Ashby](https://www.ashbyhq.com/) | Employer-hosted career pages and application forms | ATS vendors, not a guarantee of an exhaustive cross-company search or supported automation; inspect the actual page |
+| [Wellfound](https://wellfound.com/jobs/) | Add startup-focused roles to the shortlist | Confirm seniority and startup fit; no assumed account/session or supported automatic application |
+| [YC Jobs](https://www.ycombinator.com/jobs) | Discover roles at YC startups and build a startup company watchlist | Filter role/level carefully; YC affiliation is not evidence of current headcount, funding or new-grad suitability |
+| [Handshake](https://joinhandshake.com/students/) / university career portal | Internship, early-career and campus recruiting leads when relevant | User's own institution/account only; authenticated access depends on tools and permission, with no automatic login promise |
+
+For a general software internship/new-grad search, combine broad discovery, university opportunities if applicable, and employer pages; add startup sources according to the user's preferences. Prioritize job fit and reliable completion over a particular ATS brand. No fixed source percentages or submission guarantees.
