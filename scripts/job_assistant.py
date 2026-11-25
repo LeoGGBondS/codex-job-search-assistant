@@ -13,6 +13,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 STATUSES = {'discovered', 'screened', 'skipped', 'drafted', 'needs_input', 'ready',
             'submitted', 'submission_unknown', 'rejected', 'interview', 'withdrawn'}
+BLOCKER_KINDS = {'email_verification', 'login', 'captcha', 'missing_material', 'required_answer',
+                 'upload_failed', 'tool_unavailable', 'site_error', 'consent', 'receipt_unverified', 'other'}
+MAIL_CATEGORIES = {'acknowledgement', 'interview', 'assessment', 'rejection', 'offer', 'other'}
+
 OUTCOMES = {'rejected', 'interview', 'withdrawn'}
 TRACKING = {'gh_src', 'source', 'ref', 'refid', 'trackingid', 'lever-source'}
 
@@ -142,6 +146,11 @@ class Store:
             'current_location': {'city': None, 'region': None, 'country': None},
             'preference_policy': {'resume_based_ranking': None, 'engineering_ranking': [], 'office_ranking': []},
             'application_answers': {},
+            'optional_materials': {'transcripts': []},
+            'email_tracking': {'enabled': False, 'provider': None, 'account_key': None,
+                               'query_scope': None, 'verification_assistance': False},
+            'screening_policy': {'freshness_hours': 24, 'fallback_freshness_hours': 48,
+                                 'max_custom_questions': 1, 'prefer_no_new_account': True},
             'work_authorization': {}, 'sponsorship_required': {},
             'gpa': {'actual': None, 'estimated': None, 'scale': None, 'source': None},
             'schedule': {'enabled': False, 'timezone': None, 'local_time': None,
@@ -259,7 +268,7 @@ class Store:
         records = self.records()
         for previous in records:
             if same_job(previous, candidate):
-                if previous['status'] == 'needs_input':
+                if previous['status'] == 'needs_input' or previous.get('blocking_items'):
                     return False, 'Review the missing materials/answers and mark this case ready before submitting'
                 if previous.get('submitted_at') or previous['status'] in {
                     'submitted', 'submission_unknown', 'withdrawn', 'rejected', 'interview', 'skipped'
@@ -329,6 +338,113 @@ class Store:
         item['status'] = 'needs_input'
         return self.record(item, now=now)
 
+    def block(self, reference, kind, reason, next_action, retry_when, now=None):
+        if kind not in BLOCKER_KINDS:
+            raise ValueError('Unknown blocker kind; use other for an unforeseen obstacle')
+        if not all(isinstance(x, str) and x.strip() for x in (reason, next_action, retry_when)):
+            raise ValueError('A blocker needs a reason, next action and retry condition')
+        item = self.lookup(reference)
+        if item.get('submitted_at') or item['status'] in OUTCOMES:
+            raise ValueError('Confirmed applications need follow-up, not a pending reapplication')
+        uncertain = item['status'] == 'submission_unknown' or kind == 'receipt_unverified'
+        item['status'] = 'submission_unknown' if uncertain else 'needs_input'
+        blocker = {'kind': kind, 'description': reason, 'next_action': next_action,
+                   'retry_when': retry_when,
+                   'recorded_at': (now or datetime.now(timezone.utc)).isoformat(timespec='seconds')}
+        # Keep all unresolved obstacles; update the same category instead of duplicating it.
+        blockers = [x for x in item.get('blocking_items', [])
+                    if not isinstance(x, dict) or x.get('kind') != kind]
+        item['blocking_items'] = blockers + [blocker]
+        return self.record(item, now=now)
+
+    def configure_email(self, enabled, provider=None, account_key=None, query_scope=None,
+                        verification_assistance=False):
+        profile = self.profile()
+        if enabled and not all(isinstance(x, str) and x.strip() for x in (provider, account_key, query_scope)):
+            raise ValueError('Email opt-in needs a provider, non-secret account key and agreed query scope')
+        profile['email_tracking'] = {'enabled': bool(enabled), 'provider': provider if enabled else None,
+                                     'account_key': account_key if enabled else None,
+                                     'query_scope': query_scope if enabled else None,
+                                     'verification_assistance': bool(enabled and verification_assistance)}
+        write_json(self.profile_path, profile)
+        # This records user intent only; a live connector must verify its own access each run.
+        return profile['email_tracking']
+
+    def email_event(self, incoming, now=None):
+        settings = self.profile().get('email_tracking', {})
+        if not settings.get('enabled'):
+            raise ValueError('Email tracking is disabled; ordinary job search remains available')
+        allowed = {'provider', 'account_key', 'message_id', 'received_at', 'category',
+                   'summary', 'source', 'case_id', 'match_evidence', 'deadline_at', 'next_action'}
+        if not isinstance(incoming, dict) or set(incoming) - allowed:
+            raise ValueError('Use minimal email metadata only; no raw bodies, codes or attachments')
+        event = dict(incoming)
+        for key in ('provider', 'account_key', 'message_id', 'received_at', 'category', 'summary', 'source'):
+            if not isinstance(event.get(key), str) or not event[key].strip():
+                raise ValueError('Missing email field: ' + key)
+        if event['provider'] != settings['provider'] or event['account_key'] != settings['account_key']:
+            raise ValueError('Email account is outside the configured scope')
+        if event['category'] not in MAIL_CATEGORIES:
+            raise ValueError('Verification emails must not be stored as tracking events')
+        timestamp(event['received_at'])
+        if event.get('deadline_at'):
+            timestamp(event['deadline_at'])
+            if not event.get('next_action'):
+                raise ValueError('A deadline needs a next action')
+        case = None
+        if event.get('case_id'):
+            case = self.lookup(event['case_id'])
+            if not event.get('match_evidence'):
+                raise ValueError('Linking email to a case requires explicit matching evidence')
+            event['case_id'] = case['case_id']
+        # Identity includes the account so identical provider IDs in different accounts do not collide.
+        identity = json.dumps([event[k] for k in ('provider','account_key','message_id')])
+        event['id'] = hashlib.sha256(identity.encode()).hexdigest()[:20]
+        events = load_json(self.personal/'email_events.json', [])
+        existing = next((x for x in events if x['id'] == event['id']), None)
+        if existing and existing.get('case_id') != event.get('case_id') and existing.get('case_id'):
+            raise ValueError('Reconcile the existing email association before changing it')
+        if existing:
+            if existing == event:
+                return existing
+            events[events.index(existing)] = event
+        else:
+            events.append(event)
+        write_json(self.personal/'email_events.json', events)
+        # Preserve the application state and receipt. Acknowledgements are not automatic proof
+        # of a new submission, and classification alone must not overwrite later outcomes.
+        if case:
+            case['email_updated_at'] = (now or datetime.now(timezone.utc)).isoformat(timespec='seconds')
+            self.record(case, now=now)
+        return event
+
+    def email_report(self, zh=False, day=None):
+        settings = self.profile().get('email_tracking', {})
+        if not settings.get('enabled'):
+            return []
+        events = load_json(self.personal/'email_events.json', [])
+        events = [x for x in events if x['provider'] == settings['provider'] and x['account_key'] == settings['account_key']]
+        if day:
+            events = [x for x in events if self.local_time(timestamp(x['received_at'])).date().isoformat() == day]
+        labels = {'acknowledgement':'投递回执', 'interview':'面试', 'assessment':'测评',
+                  'rejection':'拒信', 'offer':'录用', 'other':'其他'}
+        def clean(value):
+            return str(value or '-').replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('|',r'\|').replace('\n',' ').replace('\r',' ')
+        lines = ['', '## '+('求职邮件追踪' if zh else 'Job email tracking'), '',
+                 '| '+('编号 / 待关联 | 类型 | 收到时间 | 截止时间 | 摘要 | 下一步 | 来源' if zh else
+                        'Case / unlinked | Type | Received | Deadline | Summary | Next action | Source')+' |',
+                 '|'+'|'.join(['---']*7)+'|']
+        for event in sorted(events, key=lambda x:x['received_at'], reverse=True):
+            values = [event.get('case_id') or ('待关联' if zh else 'Unlinked'),
+                      labels[event['category']] if zh else event['category'],
+                      self.local_time(timestamp(event['received_at'])).isoformat(timespec='seconds'),
+                      self.local_time(timestamp(event['deadline_at'])).isoformat(timespec='seconds') if event.get('deadline_at') else None,
+                      event['summary'],event.get('next_action'),event['source']]
+            lines.append('| '+' | '.join(clean(x) for x in values)+' |')
+        if not events:
+            lines.append('| '+('暂无记录' if zh else 'No records')+' | - | - | - | - | - | - |')
+        return lines
+
     def report_root(self):
         settings = self.profile().get('output_settings') or {}
         target = Path(settings.get('directory') or self.root/'outputs').expanduser().resolve()
@@ -390,7 +506,7 @@ class Store:
             lines = ['| '+' | '.join(text['headers'])+' |', '|'+'|'.join(['---']*10)+'|']
             for item in sorted(items, key=lambda x:x.get('updated_at') or x.get('submitted_at') or '', reverse=True):
                 missing = item.get('blocking_items') or []
-                missing = '; '.join(x if isinstance(x,str) else x.get('description',x.get('name','')) for x in missing)
+                missing = '; '.join(x if isinstance(x,str) else ' / '.join(str(x[k]) for k in ('description','next_action','retry_when') if x.get(k)) for x in missing)
                 notes = '; '.join(x for x in [missing,item.get('notes')] if x)
                 fields = [item['case_id'],item['company'],item['role'],labels[item['status']],stamp(item.get('submitted_at')),
                           stamp(item.get('updated_at')),item['url'],item.get('resume_path'),item.get('submission_evidence'),notes]
@@ -405,7 +521,7 @@ class Store:
             receipt_count = sum(1 for x in submitted if not daily or timestamp(x['submitted_at']).astimezone(local.tzinfo).date() == local.date())
             return '\n'.join(['# '+title,'',text['date']+': '+day,'',text['updated']+': '+local.isoformat(timespec='seconds'),'',
                               text['count']+': **'+str(receipt_count)+'**','',
-                              '## '+text['submitted'],'',*table(submitted),'','## '+text['pending'],'',*table(pending),'',text['footer'],''])
+                              '## '+text['submitted'],'',*table(submitted),'','## '+text['pending'],'',*table(pending),*self.email_report(zh,day if daily else None),'',text['footer'],''])
         touched = [x for x in records if any(timestamp(x[k]).astimezone(local.tzinfo).date() == local.date()
                    for k in ('created_at','updated_at','submitted_at') if x.get(k))]
         output = self.report_root()/'applications.md'
@@ -435,6 +551,19 @@ def main():
         if name == 'resume':
             child.add_argument('--material',action='append',default=[])
             child.add_argument('--answers-file',type=Path)
+    child = commands.add_parser('block')
+    child.add_argument('reference')
+    child.add_argument('--kind', choices=sorted(BLOCKER_KINDS), required=True)
+    for name in ('reason','next-action','retry-when'):
+        child.add_argument('--'+name, required=True)
+    child = commands.add_parser('configure-email')
+    choice = child.add_mutually_exclusive_group(required=True)
+    choice.add_argument('--enable', action='store_true')
+    choice.add_argument('--disable', action='store_true')
+    for name in ('provider','account-key','query-scope'):
+        child.add_argument('--'+name)
+    child.add_argument('--verification-assistance', action='store_true')
+    commands.add_parser('email-event').add_argument('--file', type=Path, required=True)
     args=parser.parse_args()
     store=Store(args.workspace)
     try:
@@ -468,6 +597,18 @@ def main():
             item=store.request_resume(args.reference,args.material,answers)
             store.render()
             print(json.dumps(item,ensure_ascii=True,separators=(',',':')))
+        elif args.command == 'block':
+            item=store.block(args.reference,args.kind,args.reason,args.next_action,args.retry_when)
+            store.render()
+            print('Pending case '+item['case_id'])
+        elif args.command == 'configure-email':
+            store.configure_email(args.enable,args.provider,args.account_key,args.query_scope,args.verification_assistance)
+            store.render()
+            print('Email preference saved. Live access still requires an authorized connector.')
+        elif args.command == 'email-event':
+            item=store.email_event(load_json(args.file))
+            store.render()
+            print('Saved email event '+item['id'])
         elif args.command == 'artifact-dir':
             print(json.dumps({'directory':str(store.artifact_directory(args.reference))},ensure_ascii=True))
         return 0
