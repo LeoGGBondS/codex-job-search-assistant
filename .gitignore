@@ -1,0 +1,21 @@
+# Candidate data stays on each user's machine.
+/personal/
+/outputs/
+/work/
+.env
+.env.*
+!.env.example
+*.pdf
+*.doc
+*.docx
+*.rtf
+*.png
+*.jpg
+*.jpeg
+*.zip
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
+Thumbs.db
