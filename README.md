@@ -8,18 +8,18 @@
 
 1. 下载本仓库 ZIP 并解压，或 clone 到本地。
 2. 在 Codex 中打开该文件夹，确认它是当前工作目录。
-3. 发一句：**“帮我初始化求职助手。”** 或 **“Use $job-search-assistant to get started.”**
-4. 助手会分批询问你的简历、目标职位、地点、毕业/入职时间、工作授权等；已有信息不会反复问。缺少信息可以先留空。
-5. 可以先给一个 JD 测试，也可以让助手开始找岗。需要定时运行时，再告诉它时间、时区和每日上限。
+3. 发一句：**“帮我初始化求职助手。”**（中文）或 **“Initialize my job assistant.”**（English）。也可明确调用 `$job-search-assistant`。
+4. 助手先确认中文/英文输出和普通/精准投递模式，再分批询问简历、目标职位、地点、毕业/入职时间、工作授权等。支持多页简历和多份源文件；已有信息不会反复问。
+5. 首次生成的记录默认放到你实际桌面的 `Codex Job Search` 文件夹；以后更新同一个目录。设置每日运行时间、时区和上限后，每日自动运行会刷新总记录和当天的日期记录。没有调度能力时可手动运行，不能把下载等同于已启用自动化。
 
 下载本身不会弹出问卷或自动提交。首次在 Codex 中开始对话后，仓库的 AGENTS.md 和 `.agents/skills/job-search-assistant/` 引导助手完成建档；skill 的加载方式以 [Codex 官方说明](https://learn.chatgpt.com/docs/build-skills) 为准。如果没有自动选中，可明确输入 `$job-search-assistant`。
 
 ## 它能做什么
 
 - 从你的求职偏好寻找公开招聘信息，读取完整 JD 后筛选，分清硬条件、加分项和未知项。
-- 默认沿用现有简历；必要时只改少量措辞或顺序，不要求每个岗位重写。
+- **普通 / General**：沿用现有简历，必要时小改。**精准 / Precise**：读取多页来源，针对 JD 生成一页、便于 ATS 解析的简历，检查真实页数、可读性和文字顺序。不会编造经历，也不承诺 ATS 分数。
 - 使用你自己的 Codex 可用浏览器工具填写和提交已授权的申请。没有浏览器工具时准备待投队列并说明限制。
-- 保存岗位、状态、提交时间、实际简历版本、确认凭证及待处理问题，生成 `outputs/applications.md`。
+- 保存岗位、状态、提交时间、实际简历版本、确认凭证及待处理问题，生成桌面总记录 `applications.md` 和 `daily/YYYY-MM-DD.md`，状态与说明按所选语言输出。
 - 在支持 Automations 的环境中，按你的请求创建定时任务；仓库本身不内置或启动调度器。
 
 不能保证任意网站、任意验证码或任意账户流程都能无人值守完成。LinkedIn 自动抓取/站内自动操作不在此工作流内，可使用其 JD 文本及雇主官网链接。新公司首次接收个人信息、验证码或法律条款等，按实际工具要求取得确认/交接；不会因为“自动投递”就绕过这些步骤。每日上限是上限，不保证每天投满。
@@ -29,7 +29,8 @@
 | 位置 | 内容 | 默认上传 GitHub？ |
 |---|---|---|
 | `personal/` | 简历、个人资料、经历库、授权记录、原始投递记录 | 否 |
-| `outputs/` | 投递文档、岗位材料和成功截图 | 否 |
+| 桌面 `Codex Job Search/` | 总记录、带日期的每日记录、按日期/编号分组的材料和截图 | 否（在仓库外） |
+| `outputs/` | 旧安装或使用者明确选择的本地输出目录 | 否 |
 | `work/` | 临时输入与中间文件 | 否 |
 | `.agents/`、`scripts/`、`tests/` | 通用流程和记录工具 | 是 |
 
@@ -40,11 +41,14 @@
 需要 Python 3.10+。日常可让 Codex 执行，无需自己输入命令。Windows 如缺少 IANA 时区库，运行 `python -m pip install -r requirements.txt`；Codex 的捆绑 Python 也可使用。
 
 ```sh
-python scripts/job_assistant.py init
+python scripts/job_assistant.py init --message "Initialize my job assistant"
+python scripts/job_assistant.py configure --language en --mode general --output-dir desktop
 python scripts/job_assistant.py status
 python scripts/job_assistant.py record --file work/candidate.json
 python scripts/job_assistant.py gate --file work/candidate.json
 python scripts/job_assistant.py render
+python scripts/job_assistant.py lookup J0001
+python scripts/job_assistant.py resume J0001 --material personal/transcript.pdf
 python -m unittest discover -s tests -v
 python scripts/check_public.py
 ```
@@ -55,6 +59,20 @@ python scripts/check_public.py
 
 ## English quick start
 
-Open this downloaded repository as your Codex workspace and say “Use $job-search-assistant to get started.” The assistant asks for your own resume and preferences, then prepares a local profile. Search/browser/scheduler capabilities come from your Codex environment, not the Python helper. Candidate data and outputs are ignored by Git. Submission confirmations, site rules, accurate eligibility answers, and uncertainty handling still apply. No personal data from the publisher is included.
+Open this downloaded repository as your Codex workspace and say “Use $job-search-assistant to get started.” The assistant asks for your own resume and preferences, then prepares a local profile. Choose English/Chinese reports and general/precise mode. Multi-page sources are accepted; precise mode makes a verified one-page JD-specific resume using available document tools. New users get one Desktop report folder with a master log, dated daily logs and date/case-specific artifacts. Say “Resume J0001” with missing materials to continue one pending case; original URLs work too. Search/browser/scheduler capabilities come from your Codex environment, not the Python helper. Candidate data and outputs are ignored by Git. Submission confirmations, site rules, accurate eligibility answers, and uncertainty handling still apply. No personal data from the publisher is included.
 
 MIT licensed. Contributions should contain only reusable code, documentation, and synthetic test fixtures.
+
+## 待处理岗位：用短编号继续
+
+总记录中的每行有 `J0001` 这样的稳定编号。发送 **“继续 J0001”** 并附成绩单等所缺材料即可；英文可说 **“Resume J0001”**。原岗位链接也支持，但短编号通常比长链接占用更少上下文。助手只读取对应岗位、复核材料和仍开放的 JD，再补投；不会因为上传材料就重投已成功或结果不明的申请。
+
+## 输出语言、目录与模式
+
+- 中文初始化默认中文，英文初始化默认英文，也可以在首次问答明确选择，之后随时切换。申请材料遵循 JD 的语言，不必和记录语言相同。
+- 新用户的桌面目录会先解析实际位置（包括系统重定向的桌面）；需要目录访问权限时按环境提示处理。找不到真实桌面时请选择明确路径。
+- 同一个 `applications.md` 持续更新；`daily/YYYY-MM-DD.md` 按使用者时区标注日期，同一天刷新、旧日期保留。简历和凭证放在 `YYYY-MM-DD/J0001/`。
+- 旧安装升级时保留原输出位置与历史；想切到桌面可让 Codex 执行 `configure --output-dir desktop`，未来文件写到新目录，不删除旧记录。
+- 用 `configure --language zh --mode precise` 切换中文与精准模式；用 `--language en --mode general` 切回英文与普通模式。
+
+精准模式依赖使用者环境里实际可用的文档/PDF工具：导出后必须检查一页、文字可选中、没有遮挡和缺字。记录工具本身不调用模型生成简历、不自带浏览器，也不绕过网站或 Codex 的权限规则。
