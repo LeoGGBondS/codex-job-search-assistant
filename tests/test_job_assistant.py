@@ -15,7 +15,7 @@ class RecordTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.store = module.Store(self.temp.name)
-        self.store.init()
+        self.store.init(language='en', output_dir=Path(self.temp.name)/'outputs')
         profile = self.store.profile()
         profile['schedule'].update(timezone='UTC', max_submissions_per_day=1)
         module.write_json(self.store.profile_path, profile)
@@ -109,7 +109,7 @@ class RecordTests(unittest.TestCase):
         self.assertNotIn('<script>', content)
         self.assertIn('&lt;script&gt;', content)
         self.assertIn('\\| next line', content)
-        self.assertIn('已筛选', content)
+        self.assertIn('Screened', content)
 
     def test_credential_urls_rejected_without_mutation(self):
         with self.assertRaises(ValueError):
